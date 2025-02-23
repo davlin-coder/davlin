@@ -1,0 +1,264 @@
+openapi: 3.0.0
+info:
+  title: Davlin API
+  description: Davlin服务API文档
+  version: 1.0.0
+
+servers:
+  - url: /api/v1
+    description: API版本1
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 错误信息
+    SuccessMessage:
+      type: object
+      properties:
+        message:
+          type: string
+          description: 成功信息
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - password
+        - email
+        - code
+      properties:
+        username:
+          type: string
+          description: 用户名
+        password:
+          type: string
+          description: 密码
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+        code:
+          type: string
+          description: 验证码
+    LoginRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+        password:
+          type: string
+          description: 密码
+        code:
+          type: string
+          description: 验证码
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT令牌
+    VerificationCodeRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+    ChatMessage:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          description: 消息内容
+
+paths:
+  /user/register:
+    post:
+      summary: 用户注册
+      description: 注册新用户账号
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/login:
+    post:
+      summary: 用户登录
+      description: 使用邮箱和密码或验证码登录
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 登录失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/verify-code:
+    post:
+      summary: 发送验证码
+      description: 向指定邮箱发送验证码
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerificationCodeRequest'
+      responses:
+        '200':
+          description: 验证码发送成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessMessage'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /chat/message:
+    post:
+      summary: 发送聊天消息
+      description: 发送一条聊天消息
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatMessage'
+      responses:
+        '200':
+          description: 消息发送成功
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /chat/history:
+    get:
+      summary: 获取聊天历史
+      description: 获取用户的聊天历史记录
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: 成功获取聊天历史
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessage'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: 服务器内部错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: 健康检查
+      description: 检查服务是否正常运行
+      responses:
+        '200':
+          description: 服务正常运行
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  message:
+                    type: string
+                    example: Service is running normally

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
@@ -46,6 +47,7 @@ type Response struct {
 
 type TextEditor struct {
 	fileHistory map[string][]string
+	mutex      sync.RWMutex
 }
 
 func newTextEditor() *TextEditor {
@@ -110,15 +112,34 @@ func (f *TextEditor) view(_ context.Context, request *Request) (*Response, error
 }
 
 func (f *TextEditor) write(_ context.Context, request *Request) (*Response, error) {
+	// 检查文件是否存在
+	var oldContent []byte
+	if info, err := os.Stat(request.Path); err == nil && !info.IsDir() {
+		// 如果文件存在，读取旧内容用于历史记录
+		oldContent, err = os.ReadFile(request.Path)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to read existing file: %v", err)
+		}
+	}
+
+	// 写入新内容
 	if err := os.WriteFile(request.Path, []byte(request.FileText), 0644); err != nil {
 		return nil, fmt.Errorf("Failed to write file: %v", err)
 	}
 
+	// 如果有旧内容，添加到历史记录
+	if len(oldContent) > 0 {
+		f.mutex.Lock()
+		f.fileHistory[request.Path] = append(f.fileHistory[request.Path], string(oldContent))
+		f.mutex.Unlock()
+	}
+
 	return &Response{
 		FileText: request.FileText,
+		Message: fmt.Sprintf("File '%s' has been written successfully.", request.Path),
 	}, nil
 }
-func (fe *TextEditor) strReplace(_ context.Context, request *Request) (*Response, error) {
+func (f *TextEditor) strReplace(_ context.Context, request *Request) (*Response, error) {
 	if _, err := os.Stat(request.Path); err != nil {
 		return nil, fmt.Errorf("File '%s' does not exist, you can write a new file with the `write` command", request.Path)
 	}
@@ -139,7 +160,9 @@ func (fe *TextEditor) strReplace(_ context.Context, request *Request) (*Response
 		return nil, fmt.Errorf("'old_str' must appear exactly once in the file, but it does not appear in the file. Make sure the string exactly matches existing file content, including whitespace!")
 	}
 
-	fe.fileHistory[request.Path] = append(fe.fileHistory[request.Path], content)
+	f.mutex.Lock()
+	f.fileHistory[request.Path] = append(f.fileHistory[request.Path], content)
+	f.mutex.Unlock()
 
 	// Replace content and write back to file (only first occurrence)
 	newContent := strings.Replace(content, request.OldStr, request.NewStr, 1)
@@ -190,12 +213,11 @@ Review the changes above for errors. Undo and edit the file again if necessary!`
 }
 
 func (f *TextEditor) undoEdit(_ context.Context, request *Request) (*Response, error) {
-	history, ok := f.fileHistory[request.Path]
-	if !ok {
-		return nil, fmt.Errorf("No edit history found for file '%s'", request.Path)
-	}
+	f.mutex.Lock()
+	defer f.mutex.Unlock()
 
-	if len(history) == 0 {
+	history, ok := f.fileHistory[request.Path]
+	if !ok || len(history) == 0 {
 		return nil, fmt.Errorf("No edit history found for file '%s'", request.Path)
 	}
 

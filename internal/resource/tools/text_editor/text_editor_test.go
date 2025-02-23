@@ -1,9 +1,11 @@
 package texteditor
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -151,4 +153,78 @@ func TestInvalidCommand(t *testing.T) {
 	if err == nil {
 		t.Error("Expected error for invalid command")
 	}
+}
+
+func TestConcurrentEdits(t *testing.T) {
+	te := newTextEditor()
+	testPath := filepath.Join(t.TempDir(), "concurrent.txt")
+	setupTestFile(t, testPath, "Initial content")
+
+	const numGoroutines = 10
+	var wg sync.WaitGroup
+	wg.Add(numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(idx int) {
+			defer wg.Done()
+			content := fmt.Sprintf("Content from goroutine %d", idx)
+			_, err := te.write(nil, &Request{Path: testPath, FileText: content})
+			if err != nil {
+				t.Errorf("Concurrent write failed: %v", err)
+			}
+		}(i)
+	}
+
+	wg.Wait()
+
+	// 验证历史记录是否正确保存
+	if len(te.fileHistory[testPath]) != numGoroutines-1 {
+		t.Errorf("Expected %d history entries, got %d", numGoroutines-1, len(te.fileHistory[testPath]))
+	}
+}
+
+func TestWriteWithHistory(t *testing.T) {
+	te := newTextEditor()
+	testPath := filepath.Join(t.TempDir(), "test.txt")
+
+	// 测试写入新文件（不应该有历史记录）
+	t.Run("write new file without history", func(t *testing.T) {
+		content := "Initial content"
+		_, err := te.write(nil, &Request{Path: testPath, FileText: content})
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if len(te.fileHistory[testPath]) != 0 {
+			t.Error("Expected no history for new file")
+		}
+	})
+
+	// 测试覆盖现有文件（应该有历史记录）
+	t.Run("overwrite existing file with history", func(t *testing.T) {
+		newContent := "Updated content"
+		_, err := te.write(nil, &Request{Path: testPath, FileText: newContent})
+		if err != nil {
+			t.Errorf("Unexpected error: %v", err)
+		}
+		if len(te.fileHistory[testPath]) != 1 {
+			t.Error("Expected one history entry after overwrite")
+		}
+	})
+}
+
+func TestLargeFileHandling(t *testing.T) {
+	te := newTextEditor()
+	testPath := filepath.Join(t.TempDir(), "large.txt")
+
+	// 创建一个超过大小限制的文件
+	largeContent := strings.Repeat("a", 500*1024) // 500KB
+	setupTestFile(t, testPath, largeContent)
+
+	// 测试查看大文件
+	t.Run("view large file", func(t *testing.T) {
+		_, err := te.view(nil, &Request{Path: testPath})
+		if err == nil {
+			t.Error("Expected error for large file")
+		}
+	})
 }

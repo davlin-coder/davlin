@@ -1,0 +1,32 @@
+# 模型配置
+llm:
+  model: "gpt-3.5-turbo"
+  api_key: ""
+  base_url: ""
+
+# MySQL配置
+mysql:
+  host: "localhost"
+  port: 3306
+  username: "root"
+  password: "root"
+  database: "davlin"
+
+# APP配置
+app:
+  port: 8080
+
+# Email配置
+email:
+  host: 
+  port: 587
+  username: "example@EMAIL"
+  password: "password"
+  from: "example@EMAIL"
+
+# Redis配置
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
