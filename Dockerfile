@@ -1,5 +1,5 @@
 # 第一阶段：构建阶段
-FROM golang:1.23.5-alpine AS builder
+FROM registry.scgzyun.com/library/golang:1.23.5-alpine AS builder
 
 # 设置工作目录
 WORKDIR /app
@@ -14,7 +14,7 @@ RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -o davlin ./cmd/main.go
 
 # 第二阶段：运行阶段
-FROM alpine:latest
+FROM registry.scgzyun.com/library/alpine:latest
 
 # 安装基本工具和SSL证书
 RUN apk --no-cache add ca-certificates tzdata
