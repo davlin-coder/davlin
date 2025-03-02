@@ -28,7 +28,7 @@ func main() {
 
 	err = c.Invoke(func(conf *config.Config, router *gin.Engine) error {
 		port := fmt.Sprintf(":%d", conf.APP.Port)
-		fmt.Println("Service is starting at " + port)
+		fmt.Println("Service is starting at " + port + "...")
 		return router.Run(port)
 	})
 	if err != nil {
